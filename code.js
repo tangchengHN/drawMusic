@@ -1,5 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('doodleCanvas');
+    // ... (其他变量声明和函数如 getEventPosition, startDrawing, draw, stopDrawing, resizeCanvas 等保持不变) ...
+    // 我将仅展示修改的核心部分，主要是 playNote 和相关的 AudioContext 使用
+
+    // --- 从这里开始是 script.js 的开头部分，保持和你之前的一样 ---
     const canvasContainer = document.getElementById('canvasContainer');
     
     if (!canvas) {
@@ -32,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
         '#000000': 'sinebass',
     };
 
-    // Helper to parse hex color to RGB object
     function hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? {
@@ -41,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
             b: parseInt(result[3], 16)
         } : null;
     }
-
 
     function setCanvasDrawingDefaults() {
         ctx.strokeStyle = currentBrushColor;
@@ -61,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.height = 400;
         }
         setCanvasDrawingDefaults();
-        clearCanvasContent(false); // Clear without confirmation on resize
+        clearCanvasContent(false); 
     }
 
     resizeCanvas();
@@ -79,12 +81,11 @@ document.addEventListener('DOMContentLoaded', () => {
             brushOptions.forEach(b => b.classList.remove('active'));
             brush.classList.add('active');
             currentBrushColor = brush.dataset.color;
-            if (isDrawing) { // Update current path's style if drawing
+            if (isDrawing) { 
                 setCanvasDrawingDefaults();
             }
         });
     });
-
 
     function getEventPosition(evt) {
         const rect = canvas.getBoundingClientRect();
@@ -149,14 +150,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function getInstrumentFromPixelColor(r_pixel, g_pixel, b_pixel) {
-        let closestInstrument = PALETTE_INSTRUMENTS['#000000']; // Default to black's instrument
+        let closestInstrument = PALETTE_INSTRUMENTS['#000000']; 
         let minDistance = Infinity;
     
         for (const hexColor in PALETTE_INSTRUMENTS) {
             const paletteRgb = hexToRgb(hexColor);
             if (!paletteRgb) continue;
     
-            // Calculate squared Euclidean distance (faster than sqrt)
             const distance = Math.pow(r_pixel - paletteRgb.r, 2) +
                              Math.pow(g_pixel - paletteRgb.g, 2) +
                              Math.pow(b_pixel - paletteRgb.b, 2);
@@ -166,15 +166,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 closestInstrument = PALETTE_INSTRUMENTS[hexColor];
             }
         }
-        // If the closest color is very close (e.g., distance < 100, for squared distance), use it.
-        // For simplicity here, we just take the absolute closest.
-        // A small distance threshold (e.g., minDistance < 10*10 for squared, so sum of diffs < 10)
-        // could make it more robust against anti-aliased pixels if they are far from any palette color.
-        // However, since we draw with exact colors, the main body of the stroke should match well.
-        if (minDistance < (30*30*3)) { // Allow some deviation (e.g. each component off by up to 30)
+        // More robust matching: if a pixel color is "close enough" to a palette color
+        if (minDistance < (50*50*3)) { // Allow each component to be off by ~50
              return closestInstrument;
         }
-        return PALETTE_INSTRUMENTS['#000000']; // Fallback if no close match
+        // If no color is close, perhaps default to piano or a neutral sound
+        return PALETTE_INSTRUMENTS['#FF0000']; // Fallback to piano if no distinct color match
     }
 
 
@@ -188,16 +185,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const width = canvas.width;
         const height = canvas.height;
 
-        const totalDuration = 6; // seconds, slightly longer
+        const totalDuration = 7; // seconds, can be adjusted
         const timeStep = width > 0 ? totalDuration / width : 0.01; 
         
-        const minMidiNote = 40; // Lowered min for bass (E2)
-        const maxMidiNote = 88; // Slightly higher max (E6)
+        const minMidiNote = 36; // C2 - Lower for bass
+        const maxMidiNote = 96; // C7 - Higher for brighter sounds
         const pitchRange = maxMidiNote - minMidiNote;
 
         const notesToPlay = [];
         const currentLineWidthVal = parseInt(lineWidthInput.value, 10) || 5;
-        const scanStep = Math.max(1, Math.floor(currentLineWidthVal / 1.5)); // Scan step related to line width
+        // Adjust scanStep: make it smaller for denser note detection, larger for sparser
+        const scanStep = Math.max(2, Math.floor(currentLineWidthVal / 2)); 
 
         for (let x = 0; x < width; x += scanStep) {
             for (let y = 0; y < height; y += scanStep) {
@@ -209,19 +207,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const b = data[index+2];
                 const a = data[index+3];
 
-                if (a > 128) { // Pixel has been drawn on (alpha is not 0 or near 0)
+                if (a > 128) { 
                     const instrument = getInstrumentFromPixelColor(r, g, b);
                     const time = x * timeStep;
                     const normalizedY = (height - y) / height; 
                     const midiNote = minMidiNote + normalizedY * pitchRange;
                     const frequency = midiToFreq(midiNote);
                     
+                    // Deduplication: if a note of the same instrument is already very close in time and pitch
                     let alreadyExists = notesToPlay.some(note => 
-                        Math.abs(note.time - time) < (timeStep * scanStep * 0.8) &&
-                        Math.abs(note.originalMidi - midiNote) < 0.5 // Very close pitch (half semitone)
+                        note.instrument === instrument &&
+                        Math.abs(note.time - time) < (timeStep * scanStep * 0.7) && // Time window
+                        Math.abs(note.originalMidi - midiNote) < 0.75 // Pitch window (semitones)
                     );
 
-                    if (!alreadyExists && frequency > 0) {
+                    if (!alreadyExists && frequency > 0 && frequency < audioContext.sampleRate / 2) { // Check Nyquist
                          notesToPlay.push({ time, frequency, instrument, originalMidi: midiNote });
                     }
                 }
@@ -231,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
         notesToPlay.sort((a, b) => a.time - b.time);
 
         if (notesToPlay.length === 0) {
-            // alert("No drawing found to convert to sound."); // Optional: notify user
             return;
         }
 
@@ -244,84 +243,185 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.pow(2, (midi - 69) / 12) * 440;
     }
 
+    // --- BEAUTIFIED playNote FUNCTION ---
     function playNote(frequency, startTimeOffset, instrumentChoice) {
         if (!audioContext || frequency <= 0) return;
 
-        const currentTime = audioContext.currentTime;
-        const noteActualStartTime = currentTime + startTimeOffset;
-        
-        let oscillatorType = 'sine';
-        let attackTime = 0.01, decayTime = 0.1, sustainLevel = 0.7, releaseTime = 0.2;
-        let finalNoteDuration = 0.3; // Default duration
+        const now = audioContext.currentTime;
+        const noteStartTime = now + startTimeOffset;
 
-        const gainNode = audioContext.createGain();
-        gainNode.connect(audioContext.destination);
-        gainNode.gain.setValueAtTime(0, noteActualStartTime);
+        let osc, osc2, gainNode, filterNode, lfo;
+        let attackTime, decayTime, sustainLevel, releaseTime, noteDuration;
+        let filterAttack, filterDecay, filterSustain, filterRelease, filterFreq, filterQ, filterEnvAmount;
+
+        // Master Gain Node for this note
+        const masterGain = audioContext.createGain();
+        masterGain.connect(audioContext.destination);
+        masterGain.gain.setValueAtTime(0, noteStartTime); // Start silent
 
         switch (instrumentChoice) {
             case 'piano':
-                oscillatorType = 'triangle';
-                attackTime = 0.01; decayTime = 0.4; sustainLevel = 0.4; releaseTime = 0.3;
-                finalNoteDuration = 0.8;
-                gainNode.gain.linearRampToValueAtTime(0.8, noteActualStartTime + attackTime); 
-                gainNode.gain.linearRampToValueAtTime(sustainLevel * 0.8, noteActualStartTime + attackTime + decayTime); 
-                gainNode.gain.setValueAtTime(sustainLevel * 0.8, noteActualStartTime + finalNoteDuration - releaseTime);
-                gainNode.gain.linearRampToValueAtTime(0, noteActualStartTime + finalNoteDuration);
+                osc = audioContext.createOscillator();
+                osc.type = 'triangle'; // Softer base for piano
+                osc.frequency.setValueAtTime(frequency, noteStartTime);
+
+                // Filter for piano - make it brighter on attack, then mellower
+                filterNode = audioContext.createBiquadFilter();
+                filterNode.type = 'lowpass';
+                filterNode.Q.setValueAtTime(1, noteStartTime); // Moderate Q
+
+                filterFreq = frequency * 3; // Filter starts above fundamental
+                filterEnvAmount = frequency * 6; // How much envelope opens the filter
+
+                filterNode.frequency.setValueAtTime(filterFreq, noteStartTime);
+                filterNode.frequency.linearRampToValueAtTime(filterFreq + filterEnvAmount, noteStartTime + 0.01); // Quick open
+                filterNode.frequency.exponentialRampToValueAtTime(filterFreq * 0.8, noteStartTime + 0.3); // Mellow down
+                filterNode.frequency.linearRampToValueAtTime(frequency * 0.5, noteStartTime + 1.0); // Slow further mellowing for release
+
+                attackTime = 0.005; decayTime = 0.4; sustainLevel = 0.3; releaseTime = 0.5;
+                noteDuration = attackTime + decayTime + releaseTime + 0.2; // Total note length
+
+                masterGain.gain.linearRampToValueAtTime(0.7, noteStartTime + attackTime); // Main volume attack
+                masterGain.gain.exponentialRampToValueAtTime(sustainLevel * 0.7, noteStartTime + attackTime + decayTime); // Decay
+                masterGain.gain.setValueAtTime(sustainLevel * 0.7, noteStartTime + noteDuration - releaseTime); // Hold sustain
+                masterGain.gain.linearRampToValueAtTime(0, noteStartTime + noteDuration); // Release
+
+                osc.connect(filterNode);
+                filterNode.connect(masterGain);
+                osc.start(noteStartTime);
+                osc.stop(noteStartTime + noteDuration + 0.1);
                 break;
+
             case 'musicbox':
-                oscillatorType = 'square'; // Often brighter for music box
-                attackTime = 0.005; decayTime = 0.3;
-                finalNoteDuration = 0.005 + decayTime; 
-                gainNode.gain.linearRampToValueAtTime(0.6, noteActualStartTime + attackTime); 
-                gainNode.gain.exponentialRampToValueAtTime(0.001, noteActualStartTime + finalNoteDuration);
+                osc = audioContext.createOscillator();
+                osc.type = 'sine'; // Pure tone for music box, less harsh than square
+                osc.frequency.setValueAtTime(frequency, noteStartTime);
+                // Optional: a second slightly detuned sine for shimmer
+                osc2 = audioContext.createOscillator();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(frequency * 1.005, noteStartTime); // Slight detune
+                osc2.detune.setValueAtTime(5, noteStartTime); // another way to detune
+
+                attackTime = 0.002; 
+                noteDuration = 0.6; // Short, percussive
+
+                masterGain.gain.setValueAtTime(0, noteStartTime);
+                masterGain.gain.linearRampToValueAtTime(0.5, noteStartTime + attackTime); // Very sharp attack
+                masterGain.gain.exponentialRampToValueAtTime(0.001, noteStartTime + noteDuration); // Fast decay
+
+                osc.connect(masterGain);
+                osc2.connect(masterGain); // Mix in the second oscillator at a lower volume
+                masterGain.gain.setValueAtTime(0.25, noteStartTime); // Adjust osc2 volume relative to osc1 if needed
+                
+                osc.start(noteStartTime);
+                osc.stop(noteStartTime + noteDuration + 0.05);
+                osc2.start(noteStartTime);
+                osc2.stop(noteStartTime + noteDuration + 0.05);
                 break;
+
             case 'organ':
-                oscillatorType = 'sawtooth';
-                attackTime = 0.05; sustainLevel = 0.5; releaseTime = 0.15;
-                finalNoteDuration = 0.6; 
-                gainNode.gain.linearRampToValueAtTime(sustainLevel, noteActualStartTime + attackTime);
-                gainNode.gain.setValueAtTime(sustainLevel, noteActualStartTime + finalNoteDuration - releaseTime);
-                gainNode.gain.linearRampToValueAtTime(0, noteActualStartTime + finalNoteDuration);
+                osc = audioContext.createOscillator();
+                osc.type = 'sawtooth'; // Rich harmonics for organ
+                osc.frequency.setValueAtTime(frequency, noteStartTime);
+
+                osc2 = audioContext.createOscillator(); // Second oscillator for chorus effect
+                osc2.type = 'sawtooth';
+                osc2.frequency.setValueAtTime(frequency, noteStartTime);
+                osc2.detune.setValueAtTime(8, noteStartTime); // Detune slightly (in cents)
+
+                // LFO for vibrato/leslie-like effect
+                lfo = audioContext.createOscillator();
+                lfo.type = 'sine';
+                lfo.frequency.setValueAtTime(5, noteStartTime); // LFO rate 5Hz
+                const lfoGain = audioContext.createGain();
+                lfoGain.gain.setValueAtTime(3, noteStartTime); // LFO depth (cents for detune)
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc.detune); // Modulate detune of the first oscillator
+                lfoGain.connect(osc2.detune);
+
+                filterNode = audioContext.createBiquadFilter();
+                filterNode.type = 'lowpass';
+                filterNode.frequency.setValueAtTime(frequency * 4, noteStartTime); // Brighter organ
+                filterNode.Q.setValueAtTime(0.5, noteStartTime);
+
+                attackTime = 0.03; sustainLevel = 0.4; releaseTime = 0.1;
+                noteDuration = 0.8; // Organ notes can sustain
+
+                masterGain.gain.linearRampToValueAtTime(sustainLevel, noteStartTime + attackTime);
+                masterGain.gain.setValueAtTime(sustainLevel, noteStartTime + noteDuration - releaseTime);
+                masterGain.gain.linearRampToValueAtTime(0, noteStartTime + noteDuration);
+
+                osc.connect(filterNode);
+                osc2.connect(filterNode);
+                filterNode.connect(masterGain);
+                
+                osc.start(noteStartTime);
+                osc.stop(noteStartTime + noteDuration + 0.1);
+                osc2.start(noteStartTime);
+                osc2.stop(noteStartTime + noteDuration + 0.1);
+                lfo.start(noteStartTime);
+                lfo.stop(noteStartTime + noteDuration + 0.1);
                 break;
-            case 'synthpluck': // Yellow
-                oscillatorType = 'triangle';
-                attackTime = 0.005; decayTime = 0.2;
-                finalNoteDuration = attackTime + decayTime + 0.05;
-                gainNode.gain.linearRampToValueAtTime(0.9, noteActualStartTime + attackTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, noteActualStartTime + finalNoteDuration - 0.05);
+
+            case 'synthpluck':
+                osc = audioContext.createOscillator();
+                osc.type = 'sawtooth'; // Sawtooth for a bright pluck
+                osc.frequency.setValueAtTime(frequency, noteStartTime);
+
+                filterNode = audioContext.createBiquadFilter();
+                filterNode.type = 'lowpass';
+                filterNode.Q.setValueAtTime(2, noteStartTime); // Some resonance for 'pluckiness'
+
+                // Filter envelope - very important for pluck
+                filterFreq = frequency * 1; // Start with filter somewhat closed
+                filterEnvAmount = frequency * 10; // Open up significantly
+
+                filterNode.frequency.setValueAtTime(filterFreq, noteStartTime);
+                filterNode.frequency.linearRampToValueAtTime(filterFreq + filterEnvAmount, noteStartTime + 0.01); // Quick open
+                filterNode.frequency.exponentialRampToValueAtTime(filterFreq * 0.5, noteStartTime + 0.15); // Quick close
+
+                attackTime = 0.002; noteDuration = 0.3;
+                
+                masterGain.gain.linearRampToValueAtTime(0.6, noteStartTime + attackTime);
+                masterGain.gain.exponentialRampToValueAtTime(0.001, noteStartTime + noteDuration);
+
+                osc.connect(filterNode);
+                filterNode.connect(masterGain);
+                osc.start(noteStartTime);
+                osc.stop(noteStartTime + noteDuration + 0.05);
                 break;
-            case 'sinebass': // Black
-                oscillatorType = 'sine';
-                attackTime = 0.02; sustainLevel = 0.6; releaseTime = 0.2;
-                finalNoteDuration = 0.5;
-                gainNode.gain.linearRampToValueAtTime(sustainLevel, noteActualStartTime + attackTime);
-                gainNode.gain.setValueAtTime(sustainLevel, noteActualStartTime + finalNoteDuration - releaseTime);
-                gainNode.gain.linearRampToValueAtTime(0, noteActualStartTime + finalNoteDuration);
+
+            case 'sinebass':
+                osc = audioContext.createOscillator();
+                osc.type = 'sine'; // Pure sine for clean bass
+                osc.frequency.setValueAtTime(frequency, noteStartTime);
+
+                // Optional: slight saturation for warmth if desired (can be complex)
+                // For now, keep it clean.
+
+                attackTime = 0.01; sustainLevel = 0.5; releaseTime = 0.2;
+                noteDuration = 0.5;
+
+                masterGain.gain.linearRampToValueAtTime(sustainLevel, noteStartTime + attackTime);
+                masterGain.gain.setValueAtTime(sustainLevel, noteStartTime + noteDuration - releaseTime);
+                masterGain.gain.linearRampToValueAtTime(0, noteStartTime + noteDuration);
+
+                osc.connect(masterGain);
+                osc.start(noteStartTime);
+                osc.stop(noteStartTime + noteDuration + 0.1);
                 break;
-            default: 
-                oscillatorType = 'sine';
-                finalNoteDuration = 0.3;
-                gainNode.gain.linearRampToValueAtTime(0.5, noteActualStartTime + 0.01);
-                gainNode.gain.linearRampToValueAtTime(0, noteActualStartTime + finalNoteDuration);
+
+            default: // Fallback
+                osc = audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(frequency, noteStartTime);
+                noteDuration = 0.3;
+                masterGain.gain.linearRampToValueAtTime(0.5, noteStartTime + 0.01);
+                masterGain.gain.linearRampToValueAtTime(0, noteStartTime + noteDuration);
+                osc.connect(masterGain);
+                osc.start(noteStartTime);
+                osc.stop(noteStartTime + noteDuration + 0.05);
         }
-
-        const oscillator = audioContext.createOscillator();
-        oscillator.type = oscillatorType;
-        oscillator.frequency.setValueAtTime(frequency, noteActualStartTime);
-
-        // For some instruments, adding a slight detune or chorus can make them richer
-        // Example for organ (optional):
-        if (instrumentChoice === 'organ') {
-            const detuneOsc = audioContext.createOscillator();
-            detuneOsc.type = oscillatorType;
-            detuneOsc.frequency.setValueAtTime(frequency * 1.005, noteActualStartTime); // Slightly detuned
-            detuneOsc.connect(gainNode);
-            detuneOsc.start(noteActualStartTime);
-            detuneOsc.stop(noteActualStartTime + finalNoteDuration + 0.1);
-        }
-
-        oscillator.connect(gainNode);
-        oscillator.start(noteActualStartTime);
-        oscillator.stop(noteActualStartTime + finalNoteDuration + 0.1); // Add buffer
     }
+    // --- script.js 的其余部分（如果还有的话）保持不变 ---
 });
