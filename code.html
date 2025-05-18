@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draw to Melody</title>
+    <link rel="stylesheet" href="code.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Draw to Melody</h1>
+
+        <div class="controls">
+            <div class="color-brushes-control">
+                <label>Color Brushes 画笔颜色:</label>
+                <div class="brushes">
+                    <div class="brush-option active" data-color="#FF0000" style="background-color: #FF0000;" title="Piano"></div>
+                    <div class="brush-option" data-color="#00FF00" style="background-color: #00FF00;" title="Music Box"></div>
+                    <div class="brush-option" data-color="#0000FF" style="background-color: #0000FF;" title="Organ"></div>
+                    <div class="brush-option" data-color="#FFFF00" style="background-color: #FFFF00;" title="Synth Pluck"></div>
+                    <div class="brush-option" data-color="#000000" style="background-color: #000000;" title="Sine Bass"></div>
+                </div>
+            </div>
+
+            <div class="brush-size-control">
+                <label for="lineWidth">Brush Size 画笔大小:</label>
+                <input type="range" id="lineWidth" min="1" max="30" value="5">
+                <span id="lineWidthValue">5</span>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="doodleCanvas"></canvas>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="playSoundBtn">Turn Drawing into Music 变成音乐</button>
+            <button id="clearCanvasBtn">Clear 清除绘画</button>
+        </div>
+        
+        <p class="instructions">
+            Draw in the area above. Different colors produce different sound timbres.
+        </p>
+    </div>
+
+    <script src="code.js"></script>
+</body>
+</html>
