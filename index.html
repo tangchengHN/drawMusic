@@ -5,25 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Draw to Melody</title>
     <link rel="stylesheet" href="code.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap">
 </head>
 <body>
     <div class="container">
-        <h1>Draw to Melody</h1>
+        <div class="header">
+            <h1>Draw to Melody</h1>
+            <p class="tagline">用画笔创造你的音乐世界</p>
+        </div>
 
         <div class="controls">
             <div class="color-brushes-control">
-                <label>Color Brushes 画笔颜色:</label>
+                <label>钢琴音色选择:</label>
                 <div class="brushes">
-                    <div class="brush-option active" data-color="#FF0000" style="background-color: #FF0000;" title="Piano"></div>
-                    <div class="brush-option" data-color="#00FF00" style="background-color: #00FF00;" title="Music Box"></div>
-                    <div class="brush-option" data-color="#0000FF" style="background-color: #0000FF;" title="Organ"></div>
-                    <div class="brush-option" data-color="#FFFF00" style="background-color: #FFFF00;" title="Synth Pluck"></div>
-                    <div class="brush-option" data-color="#000000" style="background-color: #000000;" title="Sine Bass"></div>
+                    <div class="brush-option active" data-color="#E6B0AA" style="background-color: #E6B0AA;" title="Soft Piano">
+                        <span class="tooltip">轻柔钢琴</span>
+                    </div>
+                    <div class="brush-option" data-color="#D2B4DE" style="background-color: #D2B4DE;" title="Dreamy Piano">
+                        <span class="tooltip">梦幻钢琴</span>
+                    </div>
+                    <div class="brush-option" data-color="#A9CCE3" style="background-color: #A9CCE3;" title="Gentle Piano">
+                        <span class="tooltip">温柔钢琴</span>
+                    </div>
+                    <div class="brush-option" data-color="#A2D9CE" style="background-color: #A2D9CE;" title="Airy Piano">
+                        <span class="tooltip">空灵钢琴</span>
+                    </div>
+                    <div class="brush-option" data-color="#F9E79F" style="background-color: #F9E79F;" title="Warm Piano">
+                        <span class="tooltip">温暖钢琴</span>
+                    </div>
                 </div>
             </div>
 
             <div class="brush-size-control">
-                <label for="lineWidth">Brush Size 画笔大小:</label>
+                <label for="lineWidth">音符强度:</label>
                 <input type="range" id="lineWidth" min="1" max="30" value="5">
                 <span id="lineWidthValue">5</span>
             </div>
@@ -34,13 +48,17 @@
         </div>
         
         <div class="action-buttons">
-            <button id="playSoundBtn">Turn Drawing into Music 变成音乐</button>
-            <button id="clearCanvasBtn">Clear 清除绘画</button>
+            <button id="playSoundBtn">演奏作品</button>
+            <button id="clearCanvasBtn">清空画布</button>
         </div>
         
         <p class="instructions">
-            Draw in the area above. Different colors produce different sound timbres.
+            在上方画布上自由创作，不同颜色代表不同的钢琴音色变化，高度代表音高，宽度代表音量
         </p>
+        
+        <div class="producer-info">
+            <p>制作人: 星陨 | <span class="producer-tagline">用色彩谱写心灵的旋律</span></p>
+        </div>
     </div>
 
     <script src="code.js"></script>

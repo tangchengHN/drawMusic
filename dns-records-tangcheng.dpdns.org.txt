@@ -1,0 +1,4 @@
+; DNS Records for tangcheng.dpdns.org
+; Add these records to your DNS provider's configuration
+tangcheng    IN    CNAME    cname.vercel-dns.com.
+_vercel.tangcheng    IN    TXT    vc-domain-verify=tangcheng.dpdns.org,423058d707a0c76aa727
